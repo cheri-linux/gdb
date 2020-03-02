@@ -3453,7 +3453,7 @@ riscv_gdbarch_init (struct gdbarch_info info,
                                             &riscv_cheri_feature,
                                             &pending_aliases);
 
-      int bitsize = tdesc_register_bitsize (feature_fpu, "cra");
+      int bitsize = tdesc_register_bitsize (feature_cheri, "cra");
       features.clen = (bitsize / 8);
 
       if (riscv_debug_gdbarch)
