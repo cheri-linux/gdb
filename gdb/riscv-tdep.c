@@ -327,8 +327,8 @@ static const struct riscv_register_feature riscv_cheri_feature =
    { RISCV_CNULL_REGNUM + 29, { "ct4", "c29" }, RISCV_REG_REQUIRED },
    { RISCV_CNULL_REGNUM + 30, { "ct5", "c30" }, RISCV_REG_REQUIRED },
    { RISCV_CNULL_REGNUM + 31, { "ct6", "c31" }, RISCV_REG_REQUIRED },
-   { RISCV_CNULL_REGNUM + 32, { "ddc" }, RISCV_REG_REQUIRED },
-   { RISCV_CNULL_REGNUM + 33, { "pcc" }, RISCV_REG_REQUIRED },
+   { RISCV_CNULL_REGNUM + 32, { "pcc" }, RISCV_REG_REQUIRED },
+   { RISCV_CNULL_REGNUM + 33, { "ddc" }, RISCV_REG_REQUIRED },
    { RISCV_CNULL_REGNUM + 34, { "cap_valid" }, RISCV_REG_REQUIRED }
  }
 };
