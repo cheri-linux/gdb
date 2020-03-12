@@ -1077,12 +1077,12 @@ md_begin (void)
   csr_extra_hash = str_htab_create ();
 #define DECLARE_CSR(name, num, class, define_version, abort_version) \
   riscv_init_csr_hash (#name, num, class, define_version, abort_version);
-#define DECLARE_CHERI_CSR(name, num) hash_reg_name (RCLASS_SCR, #name, num);
+#define DECLARE_CHERI_SCR(name, num) hash_reg_name (RCLASS_SCR, #name, num);
 #define DECLARE_CSR_ALIAS(name, num, class, define_version, abort_version) \
   DECLARE_CSR(name, num, class, define_version, abort_version);
 #include "opcode/riscv-opc.h"
 #undef DECLARE_CSR
-#undef DECLARE_CHERI_CSR
+#undef DECLARE_CHERI_SCR
 
   opcode_names_hash = str_htab_create ();
   init_opcode_names_hash ();
