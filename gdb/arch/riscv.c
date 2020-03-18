@@ -58,6 +58,9 @@ riscv_create_target_description (const struct riscv_gdbarch_features features)
   else if (features.flen == 16)
     arch_name.append ("q");
 
+  if (features.clen != 0)
+    arch_name.append ("Xcheri");
+
   set_tdesc_architecture (tdesc, arch_name.c_str ());
 #endif
 
