@@ -836,15 +836,15 @@ const struct riscv_opcode riscv_opcodes[] =
 {"csetboundsimm", 0, INSN_CLASS_I, "Xd,Xs,j", MATCH_CSETBOUNDSIMMEDIATE, MASK_CSETBOUNDSIMMEDIATE, match_opcode, INSN_ALIAS},
 {"csetboundsexact", 0, INSN_CLASS_I, "Xd,Xs,t", MATCH_CSETBOUNDSEXACT, MASK_CSETBOUNDSEXACT, match_opcode, 0},
 
-{"ccleartag",  0, INSN_CLASS_I, "Xd,Xs",    MATCH_CCLEARTAG, MASK_CCLEARTAG, match_opcode, 0},
-{"cbuildcap",  0, INSN_CLASS_I, "Xd,Xs,Xt", MATCH_CBUILDCAP, MASK_CBUILDCAP, match_opcode, 0},
-{"ccopytype",  0, INSN_CLASS_I, "Xd,Xs,Xt", MATCH_CCOPYTYPE, MASK_CCOPYTYPE, match_opcode, 0},
-{"ccseal",     0, INSN_CLASS_I, "Xd,Xs,Xt", MATCH_CCSEAL, MASK_CCSEAL,   match_opcode, 0},
+{"ccleartag",  0, INSN_CLASS_I, "Xd,Xs",     MATCH_CCLEARTAG, MASK_CCLEARTAG, match_opcode, 0},
+{"cbuildcap",  0, INSN_CLASS_I, "Xd,XDs,Xt", MATCH_CBUILDCAP, MASK_CBUILDCAP, match_opcode, 0},
+{"ccopytype",  0, INSN_CLASS_I, "Xd,Xs,Xt",  MATCH_CCOPYTYPE, MASK_CCOPYTYPE, match_opcode, 0},
+{"ccseal",     0, INSN_CLASS_I, "Xd,Xs,Xt",  MATCH_CCSEAL, MASK_CCSEAL,   match_opcode, 0},
 
 /* Pointer-Arithmetic Instructions */
-{"ctoptr",     0, INSN_CLASS_I, "d,Xs,Xt", MATCH_CTOPTR,  MASK_CTOPTR,   match_opcode, 0},
-{"cfromptr",   0, INSN_CLASS_I, "Xd,Xs,t", MATCH_CFROMPTR, MASK_CFROMPTR, match_opcode, 0},
-{"csub",       0, INSN_CLASS_I, "d,Xs,Xt", MATCH_CSUB,    MASK_CSUB,     match_opcode, 0},
+{"ctoptr",     0, INSN_CLASS_I, "d,Xs,XDt", MATCH_CTOPTR,  MASK_CTOPTR,   match_opcode, 0},
+{"cfromptr",   0, INSN_CLASS_I, "Xd,XDs,t", MATCH_CFROMPTR, MASK_CFROMPTR, match_opcode, 0},
+{"csub",       0, INSN_CLASS_I, "d,Xs,Xt",  MATCH_CSUB,    MASK_CSUB,     match_opcode, 0},
 
 {"cmove",      0, INSN_CLASS_I, "Xd,Xs",   MATCH_CMOVE,   MASK_CMOVE,    match_opcode, 0},
 
@@ -856,7 +856,7 @@ const struct riscv_opcode riscv_opcodes[] =
 {"ccall",      0, INSN_CLASS_I, "Xs,Xt",   MATCH_CCALL,   MASK_CCALL,    match_opcode, INSN_BRANCH},
 
 /* Assertion Instructions */
-{"ctestsubset", 0, INSN_CLASS_I, "d,Xs,Xt",MATCH_CTESTSUBSET, MASK_CTESTSUBSET, match_opcode, 0},
+{"ctestsubset", 0, INSN_CLASS_I, "d,XDs,Xt", MATCH_CTESTSUBSET, MASK_CTESTSUBSET, match_opcode, 0},
 
 /* Special Capability Register Access Instructions */
 {"cspecialr",  0, INSN_CLASS_I, "Xd,XE",   MATCH_CSPECIALRW, MASK_CSPECIALRW | MASK_RS1, match_opcode, INSN_ALIAS},
