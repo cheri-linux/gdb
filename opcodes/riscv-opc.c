@@ -99,7 +99,7 @@ const char * const riscv_gpcr_names_abi[NGPCR] = {
 #define MASK_AQ (OP_MASK_AQ << OP_SH_AQ)
 #define MASK_RL (OP_MASK_RL << OP_SH_RL)
 #define MASK_AQRL (MASK_AQ | MASK_RL)
-#define MASK_CSR (OP_MASK_CSR << OP_SH_CSR)
+#define MASK_CSR ((insn_t) OP_MASK_CSR << OP_SH_CSR)
 
 /* CHERI */
 #define MASK_CS1 (OP_MASK_RS1 << OP_SH_RS1)
@@ -225,7 +225,7 @@ const struct riscv_opcode riscv_opcodes[] =
 {
 /* name,     xlen, isa,   operands, match, mask, match_func, pinfo.  */
 {"unimp",       0, INSN_CLASS_C,   "",  0, 0xffffU,  match_opcode, INSN_ALIAS },
-{"unimp",       0, INSN_CLASS_I,   "",  MATCH_CSRRW | (CSR_CYCLE << OP_SH_CSR), 0xffffffffU,  match_opcode, 0 }, /* csrw cycle, x0 */
+{"unimp",       0, INSN_CLASS_I,   "",  MATCH_CSRRW | ((insn_t) CSR_CYCLE << OP_SH_CSR), 0xffffffffU,  match_opcode, 0 }, /* csrw cycle, x0 */
 {"ebreak",      0, INSN_CLASS_C,   "",  MATCH_C_EBREAK, MASK_C_EBREAK, match_opcode, INSN_ALIAS },
 {"ebreak",      0, INSN_CLASS_I,   "",    MATCH_EBREAK, MASK_EBREAK, match_opcode, 0 },
 {"sbreak",      0, INSN_CLASS_C,   "",  MATCH_C_EBREAK, MASK_C_EBREAK, match_opcode, INSN_ALIAS },
@@ -830,10 +830,11 @@ const struct riscv_opcode riscv_opcodes[] =
 {"csetoffset", 0, INSN_CLASS_I, "Xd,Xs,t", MATCH_CSETOFFSET, MASK_CSETOFFSET, match_opcode, 0},
 {"cincoffset", 0, INSN_CLASS_I, "Xd,Xs,t", MATCH_CINCOFFSET, MASK_CINCOFFSET, match_opcode, 0},
 {"cincoffset", 0, INSN_CLASS_I, "Xd,Xs,j", MATCH_CINCOFFSETIMMEDIATE, MASK_CINCOFFSETIMMEDIATE, match_opcode, 0},
-{"cincoffset", 0, INSN_CLASS_I, "Xd,Xs,j", MATCH_CINCOFFSETIMMEDIATE, MASK_CINCOFFSETIMMEDIATE, match_opcode, INSN_ALIAS},
+{"cincoffsetimm", 0, INSN_CLASS_I, "Xd,Xs,j", MATCH_CINCOFFSETIMMEDIATE, MASK_CINCOFFSETIMMEDIATE, match_opcode, INSN_ALIAS},
 {"csetbounds", 0, INSN_CLASS_I, "Xd,Xs,t", MATCH_CSETBOUNDS, MASK_CSETBOUNDS,   match_opcode, 0},
-{"csetboundsexact", 0, INSN_CLASS_I, "Xd,Xs,t", MATCH_CSETBOUNDSEXACT, MASK_CSETBOUNDSEXACT, match_opcode, 0},
 {"csetbounds", 0, INSN_CLASS_I, "Xd,Xs,j", MATCH_CSETBOUNDSIMMEDIATE, MASK_CSETBOUNDSIMMEDIATE, match_opcode, 0},
+{"csetboundsimm", 0, INSN_CLASS_I, "Xd,Xs,j", MATCH_CSETBOUNDSIMMEDIATE, MASK_CSETBOUNDSIMMEDIATE, match_opcode, INSN_ALIAS},
+{"csetboundsexact", 0, INSN_CLASS_I, "Xd,Xs,t", MATCH_CSETBOUNDSEXACT, MASK_CSETBOUNDSEXACT, match_opcode, 0},
 
 {"ccleartag",  0, INSN_CLASS_I, "Xd,Xs",    MATCH_CCLEARTAG, MASK_CCLEARTAG, match_opcode, 0},
 {"cbuildcap",  0, INSN_CLASS_I, "Xd,Xs,Xt", MATCH_CBUILDCAP, MASK_CBUILDCAP, match_opcode, 0},
@@ -852,8 +853,7 @@ const struct riscv_opcode riscv_opcodes[] =
 {"cjr",        0, INSN_CLASS_I, "Xs",      MATCH_CJALR,   MASK_CJALR | MASK_CD, match_opcode, INSN_ALIAS|INSN_BRANCH },
 {"cjalr",      0, INSN_CLASS_I, "Xd,Xs",   MATCH_CJALR,   MASK_CJALR,    match_opcode, INSN_JSR},
 
-/* FIXME: Hardcode selector or make it immdediate (provided by user?) */
-{"ccall",      0, INSN_CLASS_I, "Xd,Xs",   MATCH_CCALL,   MASK_CCALL,    match_opcode, INSN_BRANCH},
+{"ccall",      0, INSN_CLASS_I, "Xs,Xt",   MATCH_CCALL,   MASK_CCALL,    match_opcode, INSN_BRANCH},
 
 /* Assertion Instructions */
 {"ctestsubset", 0, INSN_CLASS_I, "d,Xs,Xt",MATCH_CTESTSUBSET, MASK_CTESTSUBSET, match_opcode, 0},
@@ -935,21 +935,51 @@ const struct riscv_opcode riscv_opcodes[] =
 
 /* Memory-Access Instructions */
 {"lc",         32, INSN_CLASS_I, "Xd,o(s)", MATCH_LD, MASK_LD, match_opcode, INSN_DREF|INSN_8_BYTE},
-{"sc",         32, INSN_CLASS_I, "Xt,q(s)", MATCH_SD, MASK_SD, match_opcode, INSN_DREF|INSN_8_BYTE},
 {"lc",         64, INSN_CLASS_I, "Xd,o(s)", MATCH_LQ, MASK_LQ, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"sc",         32, INSN_CLASS_I, "Xt,q(s)", MATCH_SD, MASK_SD, match_opcode, INSN_DREF|INSN_8_BYTE},
 {"sc",         64, INSN_CLASS_I, "Xt,q(s)", MATCH_SQ, MASK_SQ, match_opcode, INSN_DREF|INSN_16_BYTE},
 
 /* Atomic Memory-Access Instructions */
-{"lr.c",       32, INSN_CLASS_A, "Xd,(s)", MATCH_LR_D, MASK_LR_D, match_opcode, INSN_DREF|INSN_8_BYTE},
-{"sc.c",       32, INSN_CLASS_A, "Xd,t,(s)", MATCH_SC_D, MASK_SC_D, match_opcode, INSN_DREF|INSN_8_BYTE},
-{"amoswap.c",  32, INSN_CLASS_A, "Xd,t,(s)", MATCH_AMOSWAP_D, MASK_AMOSWAP_D, match_opcode, INSN_DREF|INSN_8_BYTE },
-{"lr.c",       64, INSN_CLASS_A, "Xd,(s)", MATCH_LR_Q, MASK_LR_Q, match_opcode, INSN_DREF|INSN_16_BYTE},
-{"sc.c",       64, INSN_CLASS_A, "Xd,t,(s)", MATCH_SC_Q, MASK_SC_Q, match_opcode, INSN_DREF|INSN_16_BYTE},
-{"amoswap.c",  64, INSN_CLASS_A, "Xd,t,(s)", MATCH_AMOSWAP_Q, MASK_AMOSWAP_D, match_opcode, INSN_DREF|INSN_16_BYTE },
-{"lr.b",        0, INSN_CLASS_A, "d,(s)", MATCH_LR_B, MASK_LR_B, match_opcode, INSN_DREF|INSN_1_BYTE},
-{"sc.b",        0, INSN_CLASS_A, "d,t,(s)", MATCH_SC_B, MASK_SC_B, match_opcode, INSN_DREF|INSN_1_BYTE},
-{"lr.h",        0, INSN_CLASS_A, "d,(s)", MATCH_LR_H, MASK_LR_H, match_opcode, INSN_DREF|INSN_2_BYTE},
-{"sc.h",        0, INSN_CLASS_A, "d,t,(s)", MATCH_SC_H, MASK_SC_H, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"lr.b",        0, INSN_CLASS_A, "d,0(s)", MATCH_LR_B, MASK_LR_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"sc.b",        0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_B, MASK_SC_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"lr.b.aq",     0, INSN_CLASS_A, "d,0(s)", MATCH_LR_B | MASK_AQ, MASK_LR_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"sc.b.aq",     0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_B | MASK_AQ, MASK_SC_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"lr.b.rl",     0, INSN_CLASS_A, "d,0(s)", MATCH_LR_B | MASK_RL, MASK_LR_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"sc.b.rl",     0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_B | MASK_RL, MASK_SC_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"lr.b.aqrl",   0, INSN_CLASS_A, "d,0(s)", MATCH_LR_B | MASK_AQRL, MASK_LR_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"sc.b.aqrl",   0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_B | MASK_AQRL, MASK_SC_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_1_BYTE},
+{"lr.h",        0, INSN_CLASS_A, "d,0(s)", MATCH_LR_B, MASK_LR_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"sc.h",        0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_B, MASK_SC_B | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"lr.h.aq",     0, INSN_CLASS_A, "d,0(s)", MATCH_LR_H | MASK_AQ, MASK_LR_H | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"sc.h.aq",     0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_H | MASK_AQ, MASK_SC_H | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"lr.h.rl",     0, INSN_CLASS_A, "d,0(s)", MATCH_LR_H | MASK_RL, MASK_LR_H | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"sc.h.rl",     0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_H | MASK_RL, MASK_SC_H | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"lr.h.aqrl",   0, INSN_CLASS_A, "d,0(s)", MATCH_LR_H | MASK_AQRL, MASK_LR_H | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"sc.h.aqrl",   0, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_H | MASK_AQRL, MASK_SC_H | MASK_AQRL, match_opcode, INSN_DREF|INSN_2_BYTE},
+{"lr.c",       32, INSN_CLASS_A, "Xd,0(s)", MATCH_LR_D, MASK_LR_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"lr.c",       64, INSN_CLASS_A, "Xd,0(s)", MATCH_LR_Q, MASK_LR_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"sc.c",       32, INSN_CLASS_A, "Xd,t,0(s)", MATCH_SC_D, MASK_SC_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"sc.c",       64, INSN_CLASS_A, "Xd,t,0(s)", MATCH_SC_Q, MASK_SC_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"lr.c.aq",    32, INSN_CLASS_A, "d,0(s)", MATCH_LR_D | MASK_AQ, MASK_LR_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"lr.c.aq",    64, INSN_CLASS_A, "d,0(s)", MATCH_LR_Q | MASK_AQ, MASK_LR_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"sc.c.aq",    32, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_D | MASK_AQ, MASK_SC_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"sc.c.aq",    64, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_Q | MASK_AQ, MASK_SC_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"lr.c.rl",    32, INSN_CLASS_A, "d,0(s)", MATCH_LR_D | MASK_RL, MASK_LR_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"lr.c.rl",    64, INSN_CLASS_A, "d,0(s)", MATCH_LR_Q | MASK_RL, MASK_LR_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"sc.c.rl",    32, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_D | MASK_RL, MASK_SC_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"sc.c.rl",    64, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_Q | MASK_RL, MASK_SC_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"lr.c.aqrl",  32, INSN_CLASS_A, "d,0(s)", MATCH_LR_D | MASK_AQRL, MASK_LR_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"lr.c.aqrl",  64, INSN_CLASS_A, "d,0(s)", MATCH_LR_Q | MASK_AQRL, MASK_LR_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"sc.c.aqrl",  32, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_D | MASK_AQRL, MASK_SC_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE},
+{"sc.c.aqrl",  64, INSN_CLASS_A, "d,t,0(s)", MATCH_SC_Q | MASK_AQRL, MASK_SC_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE},
+{"amoswap.c",      32, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_D, MASK_AMOSWAP_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE },
+{"amoswap.c",      64, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_Q, MASK_AMOSWAP_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE },
+{"amoswap.c.aq",   32, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_D | MASK_AQ, MASK_AMOSWAP_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE },
+{"amoswap.c.aq",   64, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_Q | MASK_AQ, MASK_AMOSWAP_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE },
+{"amoswap.c.rl",   32, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_D | MASK_RL, MASK_AMOSWAP_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE },
+{"amoswap.c.rl",   64, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_Q | MASK_RL, MASK_AMOSWAP_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE },
+{"amoswap.c.aqrl", 32, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_D | MASK_AQRL, MASK_AMOSWAP_D | MASK_AQRL, match_opcode, INSN_DREF|INSN_8_BYTE },
+{"amoswap.c.aqrl", 64, INSN_CLASS_A, "Xd,t,0(s)", MATCH_AMOSWAP_Q | MASK_AQRL, MASK_AMOSWAP_Q | MASK_AQRL, match_opcode, INSN_DREF|INSN_16_BYTE },
 
 /* Terminate the list.  */
 {0, 0, INSN_CLASS_NONE, 0, 0, 0, 0, 0}
