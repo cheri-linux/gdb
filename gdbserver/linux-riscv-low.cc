@@ -101,13 +101,33 @@ static void
 riscv_fill_gregset (struct regcache *regcache, void *buf)
 {
   const struct target_desc *tdesc = regcache->tdesc;
-  elf_gregset_t *regset = (elf_gregset_t *) buf;
-  int regno = find_regno (tdesc, "zero");
+  int regno_null, regno_pc;
+  int regsize;
   int i;
 
-  collect_register_by_name (regcache, "pc", *regset);
-  for (i = 1; i < ARRAY_SIZE (*regset); i++)
-    collect_register (regcache, regno + i, *regset + i);
+  if (tdesc_contains_feature (tdesc, "org.gnu.gdb.riscv.cheri"))
+    {
+      regno_null = find_regno (tdesc, "cnull");
+      regno_pc = find_regno (tdesc, "pcc");
+
+      regsize = register_size (tdesc, regno_pc);
+
+      collect_register (regcache, regno_pc, buf);
+      collect_register_by_name (regcache, "ddc", (uint8_t *)buf
+				+ (regno_pc - regno_null) * regsize);
+      for (i = 1; i < (regno_pc - regno_null); i++)
+	collect_register (regcache, regno_null + i, (uint8_t *)buf
+			  + i * regsize);
+    }
+  else
+    regsize = register_size (tdesc, find_regno (tdesc, "pc"));
+
+  regno_null = find_regno (tdesc, "zero");
+  regno_pc = find_regno (tdesc, "pc");
+
+  collect_register (regcache, regno_pc, buf);
+  for (i = 1; i < (regno_pc - regno_null); i++)
+    collect_register (regcache, regno_null + i, (uint8_t *)buf + i * regsize);
 }
 
 /* Supply GPRs from BUF into REGCACHE.  */
@@ -115,15 +135,36 @@ riscv_fill_gregset (struct regcache *regcache, void *buf)
 static void
 riscv_store_gregset (struct regcache *regcache, const void *buf)
 {
-  const elf_gregset_t *regset = (const elf_gregset_t *) buf;
   const struct target_desc *tdesc = regcache->tdesc;
-  int regno = find_regno (tdesc, "zero");
+  int regno_null, regno_pc;
+  int regsize;
   int i;
 
-  supply_register_by_name (regcache, "pc", *regset);
-  supply_register_zeroed (regcache, regno);
-  for (i = 1; i < ARRAY_SIZE (*regset); i++)
-    supply_register (regcache, regno + i, *regset + i);
+  if (tdesc_contains_feature (tdesc, "org.gnu.gdb.riscv.cheri"))
+    {
+      regno_null = find_regno (tdesc, "cnull");
+      regno_pc = find_regno (tdesc, "pcc");
+
+      regsize = register_size (tdesc, regno_pc);
+
+      supply_register (regcache, regno_pc, buf);
+      supply_register_zeroed (regcache, regno_null);
+      supply_register_by_name (regcache, "ddc", (uint8_t*)buf
+			       + (regno_pc - regno_null) * regsize);
+      for (i = 1; i < (regno_pc - regno_null); i++)
+	supply_register (regcache, regno_null + i, (uint8_t *)buf
+			 + i * regsize);
+    }
+  else
+    regsize = register_size (tdesc, find_regno (tdesc, "pc"));
+
+  regno_null = find_regno (tdesc, "zero");
+  regno_pc = find_regno (tdesc, "pc");
+
+  supply_register (regcache, regno_pc, buf);
+  supply_register_zeroed (regcache, regno_null);
+  for (i = 1; i < (regno_pc - regno_null); i++)
+    supply_register (regcache, regno_null + i, (uint8_t *)buf + i * regsize);
 }
 
 /* Collect FPRs from REGCACHE into BUF.  */
@@ -162,10 +203,17 @@ riscv_store_fpregset (struct regcache *regcache, const void *buf)
    so define multiple regsets for them marking them all as OPTIONAL_REGS
    rather than FP_REGS, so that "regsets_fetch_inferior_registers" picks
    the right one according to size.  */
+/* Note: storing registers is currently not supported with CHERI, because
+   the RISC-V kernel ptrace functions and, partially, GDB are not CHERI-aware.
+   They would clear the valid tags of the capabilities.  */
+
+/* Maximum regset size is defined by 33 CHERI registers of 16 byte each  */
+#define MAX_REGSET_SIZE (33 * 16)
+
 static struct regset_info riscv_regsets[] = {
   { PTRACE_GETREGSET, PTRACE_SETREGSET, NT_PRSTATUS,
-    sizeof (elf_gregset_t), GENERAL_REGS,
-    riscv_fill_gregset, riscv_store_gregset },
+    MAX_REGSET_SIZE, GENERAL_REGS,
+    NULL, riscv_store_gregset },
   { PTRACE_GETREGSET, PTRACE_SETREGSET, NT_FPREGSET,
     sizeof (struct __riscv_mc_q_ext_state), OPTIONAL_REGS,
     riscv_fill_fpregset, riscv_store_fpregset },
@@ -209,7 +257,8 @@ riscv_target::low_fetch_register (regcache *regcache, int regno)
 {
   const struct target_desc *tdesc = regcache->tdesc;
 
-  if (regno != find_regno (tdesc, "zero"))
+  if (regno != find_regno (tdesc, "zero")
+      && regno != find_regno (tdesc, "cnull"))
     return false;
   supply_register_zeroed (regcache, regno);
   return true;
@@ -226,9 +275,14 @@ riscv_target::low_supports_breakpoints ()
 CORE_ADDR
 riscv_target::low_get_pc (regcache *regcache)
 {
-  elf_gregset_t regset;
+  const struct target_desc *tdesc = regcache->tdesc;
+  int regsize;
 
-  if (sizeof (regset[0]) == 8)
+  /* CHERI: PCC and PC share the same location inside regset, since the
+     capability is not used by GDB PC is used.  */
+  regsize = register_size (tdesc, find_regno (tdesc, "pc"));
+
+  if (regsize == 8)
     return linux_get_pc_64bit (regcache);
   else
     return linux_get_pc_32bit (regcache);
@@ -239,9 +293,14 @@ riscv_target::low_get_pc (regcache *regcache)
 void
 riscv_target::low_set_pc (regcache *regcache, CORE_ADDR newpc)
 {
-  elf_gregset_t regset;
+  const struct target_desc *tdesc = regcache->tdesc;
+  int regsize;
 
-  if (sizeof (regset[0]) == 8)
+  /* CHERI: PCC and PC share the same location inside regset, since the
+     capability is not used by GDB PC is used.  */
+  regsize = register_size (tdesc, find_regno (tdesc, "pc"));
+
+  if (regsize == 8)
     linux_set_pc_64bit (regcache, newpc);
   else
     linux_set_pc_32bit (regcache, newpc);
