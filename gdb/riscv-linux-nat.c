@@ -73,6 +73,16 @@ supply_gregset_regnum (struct regcache *regcache, const prgregset_t *gregs,
 
       /* Fill the inaccessible zero register with zero.  */
       regcache->raw_supply_zeroed (0);
+
+      /* We only support the integer registers and PC here.  */
+      for (i = RISCV_CNULL_REGNUM + 1; i < RISCV_PCC_REGNUM; i++)
+	regcache->raw_supply (i, buf + i * regsize);
+
+      /* GDB does not store PCC in reg 0, the Linux kernel does.  */
+      regcache->raw_supply (RISCV_PCC_REGNUM, buf + 0);
+
+      /* Fill the inaccessible cnull register with zero.  */
+      regcache->raw_supply_zeroed (RISCV_CNULL_REGNUM);
     }
   else if (regnum == RISCV_ZERO_REGNUM)
     regcache->raw_supply_zeroed (0);
@@ -80,6 +90,16 @@ supply_gregset_regnum (struct regcache *regcache, const prgregset_t *gregs,
     regcache->raw_supply (regnum, buf + regnum * regsize);
   else if (regnum == RISCV_PC_REGNUM)
     regcache->raw_supply (32, buf + 0);
+  else if (regnum == RISCV_CNULL_REGNUM)
+    regcache->raw_supply_zeroed (RISCV_CNULL_REGNUM);
+  else if (regnum > RISCV_CNULL_REGNUM && regnum < RISCV_PCC_REGNUM)
+    regcache->raw_supply (regnum, buf
+			  + (regnum - RISCV_CNULL_REGNUM) * regsize);
+  else if (regnum == RISCV_PCC_REGNUM)
+    regcache->raw_supply (RISCV_PCC_REGNUM, buf + 0);
+  else if (regnum == RISCV_DDC_REGNUM)
+    regcache->raw_supply (RISCV_DDC_REGNUM, buf
+			  + (RISCV_PCC_REGNUM - RISCV_CNULL_REGNUM) * regsize);
 }
 
 /* Copy all general purpose registers from regset GREGS into REGCACHE.  */
@@ -153,6 +173,12 @@ fill_gregset (const struct regcache *regcache, prgregset_t *gregs, int regnum)
 	regcache->raw_collect (i, buf + i * regsize);
 
       regcache->raw_collect (32, buf + 0);
+
+      /* We only support the integer registers and PC here.  */
+      for (int i = RISCV_CNULL_REGNUM + 1; i < RISCV_PCC_REGNUM; i++)
+	regcache->raw_collect (i, buf + i * regsize);
+
+      regcache->raw_collect (RISCV_PCC_REGNUM, buf + 0);
     }
   else if (regnum == RISCV_ZERO_REGNUM)
     /* Nothing to do here.  */
@@ -161,6 +187,17 @@ fill_gregset (const struct regcache *regcache, prgregset_t *gregs, int regnum)
     regcache->raw_collect (regnum, buf + regnum * regsize);
   else if (regnum == RISCV_PC_REGNUM)
     regcache->raw_collect (32, buf + 0);
+  else if (regnum == RISCV_CNULL_REGNUM)
+    /* Nothing to do here.  */
+    ;
+  else if (regnum > RISCV_CNULL_REGNUM && regnum < RISCV_PCC_REGNUM)
+    regcache->raw_collect (regnum, buf
+			   + (regnum - RISCV_CNULL_REGNUM) * regsize);
+  else if (regnum == RISCV_PCC_REGNUM)
+    regcache->raw_collect (RISCV_PCC_REGNUM, buf + 0);
+  else if (regnum == RISCV_DDC_REGNUM)
+    regcache->raw_collect (RISCV_DDC_REGNUM, buf
+			   + (RISCV_PCC_REGNUM - RISCV_CNULL_REGNUM) * regsize);
 }
 
 /* Copy floating point register REGNUM (or all fp regs if REGNUM == -1)
@@ -225,6 +262,7 @@ riscv_linux_nat_target::fetch_registers (struct regcache *regcache, int regnum)
   tid = get_ptrace_pid (regcache->ptid());
 
   if ((regnum >= RISCV_ZERO_REGNUM && regnum <= RISCV_PC_REGNUM)
+      || (regnum >= RISCV_CNULL_REGNUM && regnum <= RISCV_DDC_REGNUM)
       || (regnum == -1))
     {
       struct iovec iov;
@@ -282,6 +320,7 @@ riscv_linux_nat_target::store_registers (struct regcache *regcache, int regnum)
   tid = get_ptrace_pid (regcache->ptid ());
 
   if ((regnum >= RISCV_ZERO_REGNUM && regnum <= RISCV_PC_REGNUM)
+      || (regnum >= RISCV_CNULL_REGNUM && regnum <= RISCV_DDC_REGNUM)
       || (regnum == -1))
     {
       struct iovec iov;
