@@ -154,6 +154,36 @@ riscv_linux_sigframe_init (const struct tramp_frame *self,
   trad_frame_set_id (this_cache, frame_id_build (frame_sp, func));
 }
 
+/* The default implementation of auxv_parse uses the size of the data pointer
+   type as the size of auxv types and values. This does not work if the CHERI
+   extension is active, because it uses 128-bit data pointers while the auxv
+   type and values fields are 64-bit long.  */
+
+static int
+riscv_linux_auxv_parse (struct gdbarch *gdbarch, gdb_byte **readptr,
+			gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
+{
+  struct type *unsigned_long_type =
+    builtin_type (gdbarch)->builtin_unsigned_long;
+  const int sizeof_auxv_vec = TYPE_LENGTH (unsigned_long_type);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  gdb_byte *ptr = *readptr;
+
+  if (endptr == ptr)
+    return 0;
+
+  if (endptr - ptr < 2 * sizeof_auxv_vec)
+    return -1;
+
+  *typep = extract_unsigned_integer (ptr, sizeof_auxv_vec, byte_order);
+  ptr += sizeof_auxv_vec;
+  *valp = extract_unsigned_integer (ptr, sizeof_auxv_vec, byte_order);
+  ptr += sizeof_auxv_vec;
+
+  *readptr = ptr;
+  return 1;
+}
+
 /* Initialize RISC-V Linux ABI info.  */
 
 static void
@@ -182,6 +212,8 @@ riscv_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   set_gdbarch_iterate_over_regset_sections
     (gdbarch, riscv_linux_iterate_over_regset_sections);
+
+  set_gdbarch_auxv_parse (gdbarch, riscv_linux_auxv_parse);
 
   tramp_frame_prepend_unwinder (gdbarch, &riscv_linux_sigframe);
 }
