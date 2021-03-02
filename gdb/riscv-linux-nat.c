@@ -319,6 +319,10 @@ riscv_linux_nat_target::store_registers (struct regcache *regcache, int regnum)
 
   tid = get_ptrace_pid (regcache->ptid ());
 
+  /* Note: storing registers is currently not supported with CHERI, because
+     the RISC-V kernel ptrace functions and, partially, GDB are not CHERI-aware.
+     They would clear the valid tags of the capabilities.  */
+#if 0
   if ((regnum >= RISCV_ZERO_REGNUM && regnum <= RISCV_PC_REGNUM)
       || (regnum >= RISCV_CNULL_REGNUM && regnum <= RISCV_DDC_REGNUM)
       || (regnum == -1))
@@ -341,6 +345,7 @@ riscv_linux_nat_target::store_registers (struct regcache *regcache, int regnum)
 	    perror_with_name (_("Couldn't set registers"));
 	}
     }
+#endif
 
   if ((regnum >= RISCV_FIRST_FP_REGNUM
        && regnum <= RISCV_LAST_FP_REGNUM)
