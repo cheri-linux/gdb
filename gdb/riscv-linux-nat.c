@@ -22,6 +22,7 @@
 #include "linux-nat.h"
 #include "riscv-tdep.h"
 #include "inferior.h"
+#include "gdbarch.h"
 
 #include "elf/common.h"
 
@@ -57,16 +58,18 @@ supply_gregset_regnum (struct regcache *regcache, const prgregset_t *gregs,
 		       int regnum)
 {
   int i;
-  const elf_greg_t *regp = *gregs;
+  uint8_t *buf = (uint8_t *)gregs;
+  struct gdbarch *gdbarch = regcache->arch ();
+  int regsize = register_size (gdbarch, gdbarch_pc_regnum (gdbarch));
 
   if (regnum == -1)
     {
       /* We only support the integer registers and PC here.  */
       for (i = RISCV_ZERO_REGNUM + 1; i < RISCV_PC_REGNUM; i++)
-	regcache->raw_supply (i, regp + i);
+	regcache->raw_supply (i, buf + i * regsize);
 
       /* GDB stores PC in reg 32.  Linux kernel stores it in reg 0.  */
-      regcache->raw_supply (32, regp + 0);
+      regcache->raw_supply (32, buf + 0);
 
       /* Fill the inaccessible zero register with zero.  */
       regcache->raw_supply_zeroed (0);
@@ -74,9 +77,9 @@ supply_gregset_regnum (struct regcache *regcache, const prgregset_t *gregs,
   else if (regnum == RISCV_ZERO_REGNUM)
     regcache->raw_supply_zeroed (0);
   else if (regnum > RISCV_ZERO_REGNUM && regnum < RISCV_PC_REGNUM)
-    regcache->raw_supply (regnum, regp + regnum);
+    regcache->raw_supply (regnum, buf + regnum * regsize);
   else if (regnum == RISCV_PC_REGNUM)
-    regcache->raw_supply (32, regp + 0);
+    regcache->raw_supply (32, buf + 0);
 }
 
 /* Copy all general purpose registers from regset GREGS into REGCACHE.  */
@@ -139,23 +142,25 @@ supply_fpregset (struct regcache *regcache, const prfpregset_t *fpregs)
 void
 fill_gregset (const struct regcache *regcache, prgregset_t *gregs, int regnum)
 {
-  elf_greg_t *regp = *gregs;
+  uint8_t *buf = (uint8_t *)gregs;
+  struct gdbarch *gdbarch = regcache->arch ();
+  int regsize = register_size (gdbarch, gdbarch_pc_regnum (gdbarch));
 
   if (regnum == -1)
     {
       /* We only support the integer registers and PC here.  */
       for (int i = RISCV_ZERO_REGNUM + 1; i < RISCV_PC_REGNUM; i++)
-	regcache->raw_collect (i, regp + i);
+	regcache->raw_collect (i, buf + i * regsize);
 
-      regcache->raw_collect (32, regp + 0);
+      regcache->raw_collect (32, buf + 0);
     }
   else if (regnum == RISCV_ZERO_REGNUM)
     /* Nothing to do here.  */
     ;
   else if (regnum > RISCV_ZERO_REGNUM && regnum < RISCV_PC_REGNUM)
-    regcache->raw_collect (regnum, regp + regnum);
+    regcache->raw_collect (regnum, buf + regnum * regsize);
   else if (regnum == RISCV_PC_REGNUM)
-    regcache->raw_collect (32, regp + 0);
+    regcache->raw_collect (32, buf + 0);
 }
 
 /* Copy floating point register REGNUM (or all fp regs if REGNUM == -1)
@@ -209,6 +214,9 @@ riscv_linux_nat_target::read_description ()
 /* Fetch REGNUM (or all registers if REGNUM == -1) from the target
    into REGCACHE using PTRACE_GETREGSET.  */
 
+/* Maximum regset size is defined by 33 CHERI registers of 16 byte each  */
+#define MAX_REGSET_SIZE (33 * 16)
+
 void
 riscv_linux_nat_target::fetch_registers (struct regcache *regcache, int regnum)
 {
@@ -220,7 +228,7 @@ riscv_linux_nat_target::fetch_registers (struct regcache *regcache, int regnum)
       || (regnum == -1))
     {
       struct iovec iov;
-      elf_gregset_t regs;
+      uint8_t regs[MAX_REGSET_SIZE];
 
       iov.iov_base = &regs;
       iov.iov_len = sizeof (regs);
@@ -229,7 +237,7 @@ riscv_linux_nat_target::fetch_registers (struct regcache *regcache, int regnum)
 		  (PTRACE_TYPE_ARG3) &iov) == -1)
 	perror_with_name (_("Couldn't get registers"));
       else
-	supply_gregset_regnum (regcache, &regs, regnum);
+	supply_gregset_regnum (regcache, (const prgregset_t *)&regs, regnum);
     }
 
   if ((regnum >= RISCV_FIRST_FP_REGNUM
@@ -277,7 +285,7 @@ riscv_linux_nat_target::store_registers (struct regcache *regcache, int regnum)
       || (regnum == -1))
     {
       struct iovec iov;
-      elf_gregset_t regs;
+      uint8_t regs[MAX_REGSET_SIZE];
 
       iov.iov_base = &regs;
       iov.iov_len = sizeof (regs);
@@ -287,7 +295,7 @@ riscv_linux_nat_target::store_registers (struct regcache *regcache, int regnum)
 	perror_with_name (_("Couldn't get registers"));
       else
 	{
-	  fill_gregset (regcache, &regs, regnum);
+	  fill_gregset (regcache, (prgregset_t *)&regs, regnum);
 
 	  if (ptrace (PTRACE_SETREGSET, tid, NT_PRSTATUS,
 		      (PTRACE_TYPE_ARG3) &iov) == -1)
