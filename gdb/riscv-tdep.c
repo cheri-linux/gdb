@@ -3296,8 +3296,10 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
 {
   int isa_xlen = riscv_isa_xlen (gdbarch);
   int isa_flen = riscv_isa_flen (gdbarch);
+  int isa_clen = riscv_isa_clen (gdbarch);
   int abi_xlen = riscv_abi_xlen (gdbarch);
   int abi_flen = riscv_abi_flen (gdbarch);
+  int abi_clen = riscv_abi_clen (gdbarch);
   std::string target_options;
 
   target_options = "-march=rv";
@@ -3311,9 +3313,13 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
     target_options += "imafc";
   else
     target_options += "imac";
+  if (isa_clen == 16)
+    target_options += "xcheri";
 
   target_options += " -mabi=";
-  if (abi_xlen == 8)
+  if (abi_clen == 16 && abi_xlen == 8)
+    target_options += "l64pc128";
+  else if (abi_xlen == 8)
     target_options += "lp64";
   else
     target_options += "ilp32";
