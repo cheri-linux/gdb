@@ -23,6 +23,7 @@
 #include "elf/common.h"
 #include "nat/gdb_ptrace.h"
 #include "nat/riscv-linux-tdesc.h"
+#include "riscv-tdep.h"
 
 #include <sys/uio.h>
 
@@ -39,9 +40,36 @@ riscv_linux_read_features (int tid)
   struct riscv_gdbarch_features features;
   elf_fpregset_t regs;
   int flen;
+  uint8_t gregs[RISCV_NUM_INTEGER_REGS * 16];
+  struct iovec iov;
 
-  /* Figuring out xlen is easy.  */
-  features.xlen = sizeof (elf_greg_t);
+  /* Figure out xlen and clen by issueing a ptrace call with an array, able to
+     fit a CHERI register set. Depending on how much data is written to the
+     buffer, we can determine xlen and clen. This assumes that CHERI is only
+     available on 64-bit systems.  */
+
+  iov.iov_base = &gregs;
+  iov.iov_len = RISCV_NUM_INTEGER_REGS * 16;
+  if (ptrace (PTRACE_GETREGSET, tid, NT_PRSTATUS, (PTRACE_TYPE_ARG3) &iov)
+      == -1)
+    perror_with_name (_("Couldn't get registers"));
+  else
+    {
+      switch (iov.iov_len) {
+      case RISCV_NUM_INTEGER_REGS * 16:
+	features.xlen = 8;
+	features.clen = 16;
+	break;
+      case RISCV_NUM_INTEGER_REGS * 8:
+	features.xlen = 8;
+	features.clen = 0;
+	break;
+      case RISCV_NUM_INTEGER_REGS * 4:
+	features.xlen = 4;
+	features.clen = 0;
+	break;
+      }
+    }
 
   /* Start with no f-registers.  */
   features.flen = 0;
@@ -50,7 +78,6 @@ riscv_linux_read_features (int tid)
   for (flen = sizeof (regs.__f.__f[0]); ; flen *= 2)
     {
       size_t regset_size;
-      struct iovec iov;
 
       /* Regsets have a uniform slot size, so we count FSCR like
 	 an FP data register.  */
