@@ -3866,7 +3866,12 @@ riscv_gdbarch_init (struct gdbarch_info info,
   /* Some specific register numbers GDB likes to know about.  */
   if (riscv_has_cheriabi (gdbarch))
     {
-      set_gdbarch_sp_regnum (gdbarch, RISCV_CSP_REGNUM);
+      /* HACK: use SP instead of csp to avoid errors on accessing 16-byte
+         values with extract_unsigned_integer(). See
+         dwarf2_tailcall_sniffer_first() in gdb/dwarf2/frame-tailcall.c.
+         Since we are using a split register file, this does not cause any
+         issues.  */
+      set_gdbarch_sp_regnum (gdbarch, RISCV_SP_REGNUM);
       set_gdbarch_pc_regnum (gdbarch, RISCV_PCC_REGNUM);
     }
   else
