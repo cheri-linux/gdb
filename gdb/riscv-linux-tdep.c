@@ -38,6 +38,13 @@ static const struct regcache_map_entry riscv_linux_gregmap[] =
   { 0 }
 };
 
+static const struct regcache_map_entry riscv_linux_gregmap_cheri[] =
+{
+  { 1,  RISCV_PC_REGNUM, 16 },
+  { 31, RISCV_RA_REGNUM, 16 }, /* x1 to x31 */
+  { 0 }
+};
+
 /* Define the FP register mapping.  The kernel puts the 32 FP regs first, and
    then FCSR.  */
 
@@ -48,7 +55,40 @@ static const struct regcache_map_entry riscv_linux_fregmap[] =
   { 0 }
 };
 
+static const struct regcache_map_entry riscv_linux_capregmap[] =
+{
+  { 1, RISCV_PCC_REGNUM, 0 },
+  { 31, RISCV_CRA_REGNUM, 0 },
+  { 1, RISCV_DDC_REGNUM, 0 },
+  { 0 }
+};
+
 /* Define the general register regset.  */
+
+/* We define two gregset variants here to support reading 64-bit registers
+   from 128-bit fields when CHERI is enabled and 64-bit registers from 64-bit
+   fields when CHERI is disabled.  */
+
+static void
+riscv_linux_supply_gregset_cheri (const struct regset *regset,
+				  struct regcache *regcache, int regnum,
+				  const void *buf, size_t size);
+
+static const struct regset riscv_linux_gregset_cheri =
+{
+  riscv_linux_gregmap_cheri, riscv_linux_supply_gregset_cheri,
+  regcache_collect_regset
+};
+
+static void
+riscv_linux_supply_gregset_cheri (const struct regset *regset,
+				  struct regcache *regcache, int regnum,
+				  const void *buf, size_t size)
+{
+  regcache->supply_regset (&riscv_linux_gregset_cheri, regnum, buf, size);
+  if (regnum == -1 || regnum == RISCV_ZERO_REGNUM)
+    regcache->raw_supply_zeroed (RISCV_ZERO_REGNUM);
+}
 
 static const struct regset riscv_linux_gregset =
 {
@@ -62,6 +102,28 @@ static const struct regset riscv_linux_fregset =
   riscv_linux_fregmap, regcache_supply_regset, regcache_collect_regset
 };
 
+/* Define the CHERI register regset  */
+
+static void
+riscv_linux_supply_capregset (const struct regset *regset,
+			      struct regcache *regcache, int regnum,
+			      const void *buf, size_t size);
+
+static const struct regset riscv_linux_capregset =
+{
+  riscv_linux_capregmap, riscv_linux_supply_capregset, regcache_collect_regset
+};
+
+static void
+riscv_linux_supply_capregset (const struct regset *regset,
+			      struct regcache *regcache, int regnum,
+			      const void *buf, size_t size)
+{
+  regcache->supply_regset (&riscv_linux_capregset, regnum, buf, size);
+  if (regnum == -1 || regnum == RISCV_CNULL_REGNUM)
+    regcache->raw_supply_zeroed (RISCV_CNULL_REGNUM);
+}
+
 /* Define hook for core file support.  */
 
 static void
@@ -70,8 +132,18 @@ riscv_linux_iterate_over_regset_sections (struct gdbarch *gdbarch,
                                           void *cb_data,
                                           const struct regcache *regcache)
 {
-  cb (".reg", (32 * riscv_isa_xlen (gdbarch)), (32 * riscv_isa_xlen (gdbarch)),
-      &riscv_linux_gregset, NULL, cb_data);
+  if (riscv_isa_clen (gdbarch) != 0)
+    {
+      cb (".reg", (33 * riscv_isa_clen (gdbarch)),
+	  (33 * riscv_isa_clen (gdbarch)), &riscv_linux_capregset, NULL,
+	  cb_data);
+      cb (".reg", (33 * riscv_isa_clen (gdbarch)),
+	  (33 * riscv_isa_clen (gdbarch)), &riscv_linux_gregset_cheri, NULL,
+	  cb_data);
+    }
+  else
+    cb (".reg", (32 * riscv_isa_xlen (gdbarch)),
+        (32 * riscv_isa_xlen (gdbarch)), &riscv_linux_gregset, NULL, cb_data);
   /* The kernel is adding 8 bytes for FCSR.  */
   cb (".reg2", (32 * riscv_isa_flen (gdbarch)) + 8,
       (32 * riscv_isa_flen (gdbarch)) + 8,
