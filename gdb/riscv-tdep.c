@@ -1116,9 +1116,13 @@ riscv_register_reggroup_p (struct gdbarch  *gdbarch, int regnum,
 	return (regnum <= RISCV_LAST_FP_REGNUM
 		|| regnum == RISCV_CSR_FCSR_REGNUM
 		|| regnum == RISCV_CSR_FFLAGS_REGNUM
-		|| regnum == RISCV_CSR_FRM_REGNUM);
+		|| regnum == RISCV_CSR_FRM_REGNUM
+		|| (regnum >= RISCV_FIRST_CHERI_REGNUM
+		    && regnum <= RISCV_LAST_CHERI_REGNUM));
       else
-	return regnum < RISCV_FIRST_FP_REGNUM;
+	return (regnum < RISCV_FIRST_FP_REGNUM
+		|| (regnum >= RISCV_FIRST_CHERI_REGNUM
+		    && regnum <= RISCV_LAST_CHERI_REGNUM));
     }
   else if (reggroup == system_reggroup || reggroup == csr_reggroup)
     {
