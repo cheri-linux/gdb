@@ -51,6 +51,7 @@
 #include "gdbsupport/environ.h"
 #include "gdbsupport/gdb-sigmask.h"
 #include "gdbsupport/scoped_restore.h"
+#include "elf/riscv.h"
 #ifndef ELFMAG0
 /* Don't include <linux/elf.h> here.  If it got included by gdb_proc_service.h
    then ELFMAG0 will have been defined.  If it didn't get included by
@@ -327,7 +328,8 @@ static void send_sigstop (struct lwp_info *lwp);
 /* Return non-zero if HEADER is a 64-bit ELF file.  */
 
 static int
-elf_64_header_p (const Elf64_Ehdr *header, unsigned int *machine)
+elf_64_header_p (const Elf64_Ehdr *header, unsigned int *machine,
+		 uint32_t *flags)
 {
   if (header->e_ident[EI_MAG0] == ELFMAG0
       && header->e_ident[EI_MAG1] == ELFMAG1
@@ -335,6 +337,8 @@ elf_64_header_p (const Elf64_Ehdr *header, unsigned int *machine)
       && header->e_ident[EI_MAG3] == ELFMAG3)
     {
       *machine = header->e_machine;
+      if (flags != NULL)
+	*flags = header->e_flags;
       return header->e_ident[EI_CLASS] == ELFCLASS64;
 
     }
@@ -347,7 +351,7 @@ elf_64_header_p (const Elf64_Ehdr *header, unsigned int *machine)
    and -1 if the file is not accessible or doesn't exist.  */
 
 static int
-elf_64_file_p (const char *file, unsigned int *machine)
+elf_64_file_p (const char *file, unsigned int *machine, uint32_t *flags)
 {
   Elf64_Ehdr header;
   int fd;
@@ -363,7 +367,7 @@ elf_64_file_p (const char *file, unsigned int *machine)
     }
   close (fd);
 
-  return elf_64_header_p (&header, machine);
+  return elf_64_header_p (&header, machine, flags);
 }
 
 /* Accepts an integer PID; Returns true if the executable PID is
@@ -375,7 +379,7 @@ linux_pid_exe_is_elf_64_file (int pid, unsigned int *machine)
   char file[PATH_MAX];
 
   sprintf (file, "/proc/%d/exe", pid);
-  return elf_64_file_p (file, machine);
+  return elf_64_file_p (file, machine, NULL);
 }
 
 void
@@ -6766,8 +6770,22 @@ linux_process_target::qxfer_libraries_svr4 (const char *annex,
       24,    /* l_next offset in link_map.  */
       32     /* l_prev offset in link_map.  */
     };
+
+  /* RISC-V CHERI specific link map offsets  */
+  static const struct link_map_offsets lmo_c128_offsets =
+    {
+      0,     /* r_version offset. */
+      16,    /* r_debug.r_map offset.  */
+      0,     /* l_addr offset in link_map.  */
+      16,    /* l_name offset in link_map.  */
+      32,    /* l_ld offset in link_map.  */
+      48,    /* l_next offset in link_map.  */
+      64     /* l_prev offset in link_map.  */
+    };
+
   const struct link_map_offsets *lmo;
   unsigned int machine;
+  uint32_t flags;
   int ptr_size;
   CORE_ADDR lm_addr = 0, lm_prev = 0;
   CORE_ADDR l_name, l_addr, l_ld, l_next, l_prev;
@@ -6780,8 +6798,10 @@ linux_process_target::qxfer_libraries_svr4 (const char *annex,
 
   pid = lwpid_of (current_thread);
   xsnprintf (filename, sizeof filename, "/proc/%d/exe", pid);
-  is_elf64 = elf_64_file_p (filename, &machine);
-  lmo = is_elf64 ? &lmo_64bit_offsets : &lmo_32bit_offsets;
+  is_elf64 = elf_64_file_p (filename, &machine, &flags);
+  /* RISC-V CHERI specific link map offsets  */
+  lmo = (machine == EM_RISCV && flags & EF_RISCV_CHERIABI) ? &lmo_c128_offsets
+	: is_elf64 ? &lmo_64bit_offsets : &lmo_32bit_offsets;
   ptr_size = is_elf64 ? 8 : 4;
 
   while (annex[0] != '\0')
